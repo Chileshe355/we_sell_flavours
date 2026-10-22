@@ -1,6 +1,6 @@
 # Test server details
 
-Last read-only verification: 2026-08-10
+Last read-only verification: 2026-10-22
 
 ## Endpoint and SSH bootstrap access
 
@@ -58,3 +58,12 @@ At discovery time there were no Docker containers, images, or named volumes. UFW
 - UFW is active with inbound deny by default, public TCP 80/443, and TCP 22 restricted to `197.185.251.136/32`. No Hetzner Cloud Firewall rule set was available to verify.
 - A fresh `wsfdeploy` session succeeded after firewall activation. Direct root public-key login now fails and Fail2ban's SSH jail is active.
 - The effective SSH audit printed `PasswordAuthentication yes` despite the installed `60-we-sell-flavours-hardening.conf` requesting `no`. No configured account currently has a usable password, but the corrected local provisioner now installs an earlier `00-` override; applying it on this host requires provider-console/root recovery access.
+
+## WordPress/PHP upgrade on 2026-10-22
+
+- Deployed reviewed revision `8614c1e52e22f364364d01f12e662874ad98c7e0` from the public read-only HTTPS origin.
+- WordPress 7.1.3 on PHP-FPM 8.3.36 is running and healthy with Imagick and mysqli; authenticated edge and direct-origin HTTPS health checks pass.
+- Preserved the prior live configuration in server-only safety commit `f86ad9cbd1ef79a655e9a32a7bc26b3691805328`, a root-only patch, and a root-only copy of the previous server environment file.
+- Created verified encrypted backups before and during deployment: `wsf-staging-20261022T094555Z.tar.gz.age` and `wsf-staging-20261022T094839Z.tar.gz.age`.
+- Database integrity, WordPress core checksums, `utf8mb4_unicode_520_ci`, and the existing site URL passed verification. The MariaDB, WordPress, and plugin volumes retained their original 2026-08-10 creation dates.
+- Release metadata records application image `7.1.3-php8.3.36-8614c1e52e22`; rollback metadata targets the preserved pre-upgrade configuration and paired backup.
