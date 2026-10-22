@@ -1,0 +1,8 @@
+services:
+  nginx:
+    ports: !override
+      - 80:80
+    volumes: !override
+      - wordpress_data:/var/www/html:ro
+      - ./docker/nginx/bootstrap.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - certbot_www:/var/www/certbot:ro

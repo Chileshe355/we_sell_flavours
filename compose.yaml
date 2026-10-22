@@ -1,0 +1,201 @@
+name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME in the selected environment file}
+
+x-wordpress-environment: &wordpress-environment
+  WORDPRESS_DB_HOST: mariadb:3306
+  WORDPRESS_DB_NAME: ${DB_NAME:?Set DB_NAME}
+  WORDPRESS_DB_USER: ${DB_USER:?Set DB_USER}
+  WORDPRESS_DB_PASSWORD_FILE: /run/secrets/db_password
+  WORDPRESS_DB_CHARSET: ${DB_CHARSET:-utf8mb4}
+  WORDPRESS_DB_COLLATE: ${DB_COLLATION:-utf8mb4_unicode_520_ci}
+  WORDPRESS_AUTH_KEY_FILE: /run/secrets/wp_auth_key
+  WORDPRESS_SECURE_AUTH_KEY_FILE: /run/secrets/wp_secure_auth_key
+  WORDPRESS_LOGGED_IN_KEY_FILE: /run/secrets/wp_logged_in_key
+  WORDPRESS_NONCE_KEY_FILE: /run/secrets/wp_nonce_key
+  WORDPRESS_AUTH_SALT_FILE: /run/secrets/wp_auth_salt
+  WORDPRESS_SECURE_AUTH_SALT_FILE: /run/secrets/wp_secure_auth_salt
+  WORDPRESS_LOGGED_IN_SALT_FILE: /run/secrets/wp_logged_in_salt
+  WORDPRESS_NONCE_SALT_FILE: /run/secrets/wp_nonce_salt
+  WORDPRESS_ENVIRONMENT_TYPE: ${WORDPRESS_ENVIRONMENT_TYPE:?Set WORDPRESS_ENVIRONMENT_TYPE}
+  WORDPRESS_HOME: ${WORDPRESS_HOME:?Set WORDPRESS_HOME}
+  WORDPRESS_SITEURL: ${WORDPRESS_SITEURL:?Set WORDPRESS_SITEURL}
+  WORDPRESS_LOCALE: ${WORDPRESS_LOCALE:-en_ZA}
+  WP_DEBUG: ${WP_DEBUG:-false}
+  WORDPRESS_DEBUG: ${WP_DEBUG:-false}
+  WP_DEBUG_LOG: ${WP_DEBUG_LOG:-true}
+  WP_DEBUG_DISPLAY: ${WP_DEBUG_DISPLAY:-false}
+  DISALLOW_FILE_EDIT: ${DISALLOW_FILE_EDIT:-true}
+  DISALLOW_FILE_MODS: ${DISALLOW_FILE_MODS:-true}
+  PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-256M}
+  PHP_UPLOAD_MAX_FILESIZE: ${PHP_UPLOAD_MAX_FILESIZE:-64M}
+  PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-64M}
+  PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-120}
+  PHP_MAX_INPUT_TIME: ${PHP_MAX_INPUT_TIME:-120}
+  WORDPRESS_CONFIG_EXTRA: |
+    define('WP_ENVIRONMENT_TYPE', getenv('WORDPRESS_ENVIRONMENT_TYPE'));
+    define('WP_HOME', getenv('WORDPRESS_HOME'));
+    define('WP_SITEURL', getenv('WORDPRESS_SITEURL'));
+    define('WPLANG', getenv('WORDPRESS_LOCALE'));
+    define('WP_DEBUG_LOG', filter_var(getenv('WP_DEBUG_LOG'), FILTER_VALIDATE_BOOLEAN));
+    define('WP_DEBUG_DISPLAY', filter_var(getenv('WP_DEBUG_DISPLAY'), FILTER_VALIDATE_BOOLEAN));
+    define('DISALLOW_FILE_EDIT', filter_var(getenv('DISALLOW_FILE_EDIT'), FILTER_VALIDATE_BOOLEAN));
+    define('DISALLOW_FILE_MODS', filter_var(getenv('DISALLOW_FILE_MODS'), FILTER_VALIDATE_BOOLEAN));
+    define('FORCE_SSL_ADMIN', getenv('WORDPRESS_ENVIRONMENT_TYPE') === 'staging');
+    @ini_set('display_errors', getenv('WP_DEBUG_DISPLAY') === 'true' ? '1' : '0');
+
+x-wordpress-secrets: &wordpress-secrets
+  - db_password
+  - wp_auth_key
+  - wp_secure_auth_key
+  - wp_logged_in_key
+  - wp_nonce_key
+  - wp_auth_salt
+  - wp_secure_auth_salt
+  - wp_logged_in_salt
+  - wp_nonce_salt
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
+services:
+  mariadb:
+    image: mariadb:11.4.12-noble@sha256:67873d30a17f6a9c331f06363b2fa15f38abca415529966d67c84f87f82439fe
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:?Set DB_NAME}
+      MARIADB_USER: ${DB_USER:?Set DB_USER}
+      MARIADB_PASSWORD_FILE: /run/secrets/db_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    command:
+      - --character-set-server=${DB_CHARSET:-utf8mb4}
+      - --collation-server=${DB_COLLATION:-utf8mb4_unicode_520_ci}
+      - --skip-name-resolve
+    secrets:
+      - db_password
+      - db_root_password
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging: *default-logging
+
+  wordpress:
+    build:
+      context: ./docker/wordpress
+      args:
+        WORDPRESS_IMAGE: wordpress:7.1.3-php8.3-fpm@sha256:788d6b34cb89997483ff2a08e2e04d1df28ce284ca046cd7990b0be10828c5b9
+        IMAGICK_VERSION: 3.8.0
+    image: we-sell-flavours/wordpress:${APP_IMAGE_TAG:?Set APP_IMAGE_TAG}
+    restart: unless-stopped
+    environment: *wordpress-environment
+    secrets: *wordpress-secrets
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./plugins:/var/www/html/wp-content/plugins
+    networks:
+      application:
+        gw_priority: 1
+      database:
+        gw_priority: 0
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/fpm-healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+    logging: *default-logging
+
+  nginx:
+    image: nginx:1.30.4-alpine3.24@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
+    restart: unless-stopped
+    environment:
+      NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-localhost}
+      NGINX_CLIENT_MAX_BODY_SIZE: ${NGINX_CLIENT_MAX_BODY_SIZE:-64m}
+      NGINX_FASTCGI_READ_TIMEOUT: ${NGINX_FASTCGI_READ_TIMEOUT:-120s}
+    volumes:
+      - wordpress_data:/var/www/html:ro
+      - ./docker/nginx/local.conf.template:/etc/nginx/templates/default.conf.template:ro
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+      - /etc/nginx/conf.d
+    read_only: true
+    networks:
+      - application
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --header=\"Host: $${NGINX_SERVER_NAME}\" -O - http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    logging: *default-logging
+
+  wpcli:
+    image: wordpress:cli-2.12.0-php8.3@sha256:85a4b720cd8acaf02b590eb27fcdfc2a25f67a4820e01bf0f39504b97da76a22
+    profiles: [tools]
+    user: "33:33"
+    working_dir: /var/www/html
+    environment:
+      <<: *wordpress-environment
+      HOME: /tmp
+      WP_CLI_CACHE_DIR: /tmp/wp-cli-cache
+    secrets: *wordpress-secrets
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./plugins:/var/www/html/wp-content/plugins
+    networks:
+      application:
+        gw_priority: 1
+      database:
+        gw_priority: 0
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    entrypoint: ["wp"]
+    logging: *default-logging
+
+networks:
+  application:
+  database:
+    internal: true
+
+volumes:
+  mariadb_data:
+  wordpress_data:
+
+secrets:
+  db_root_password:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/db_root_password
+  db_password:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/db_password
+  wp_auth_key:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_auth_key
+  wp_secure_auth_key:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_secure_auth_key
+  wp_logged_in_key:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_logged_in_key
+  wp_nonce_key:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_nonce_key
+  wp_auth_salt:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_auth_salt
+  wp_secure_auth_salt:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_secure_auth_salt
+  wp_logged_in_salt:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_logged_in_salt
+  wp_nonce_salt:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_nonce_salt

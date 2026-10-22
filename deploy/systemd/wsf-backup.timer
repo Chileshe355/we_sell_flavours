@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted backup for We Sell Flavours test WordPress
+
+[Timer]
+OnCalendar=*-*-* 01:23:00
+RandomizedDelaySec=30m
+Persistent=true
+Unit=wsf-backup.service
+
+[Install]
+WantedBy=timers.target

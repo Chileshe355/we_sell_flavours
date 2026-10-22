@@ -1,0 +1,7 @@
+*
+!Dockerfile
+!conf.d/
+!conf.d/zz-application.ini
+!fpm/
+!fpm/zz-health.conf
+!healthcheck.sh

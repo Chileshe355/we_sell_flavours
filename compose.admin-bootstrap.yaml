@@ -1,0 +1,11 @@
+services:
+  wpcli:
+    user: "0:0"
+    environment:
+      WP_CLI_ALLOW_ROOT: "1"
+    secrets:
+      - wp_admin_password
+
+secrets:
+  wp_admin_password:
+    file: ${SECRETS_DIR:?Set SECRETS_DIR}/wp_admin_password

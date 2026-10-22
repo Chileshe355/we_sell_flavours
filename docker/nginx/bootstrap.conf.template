@@ -1,0 +1,27 @@
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name ${NGINX_SERVER_NAME};
+    server_tokens off;
+
+    if ($host != ${NGINX_SERVER_NAME}) {
+        return 444;
+    }
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location / {
+        default_type text/plain;
+        return 503 "TLS bootstrap in progress\n";
+    }
+}

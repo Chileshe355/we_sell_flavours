@@ -1,0 +1,46 @@
+# Environment-specific configuration (commit only *.example files)
+.env
+.env.*
+!.env.*.example
+deploy/inventory.env
+
+# Runtime secrets and private key material
+secrets/
+docs/Server credentials.local.md
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+*.htpasswd
+
+# WordPress runtime state and exports
+wordpress-data/
+wp-content/uploads/
+uploads/
+database-data/
+*.sql
+*.sql.gz
+*.dump
+*.tar
+*.tar.gz
+*.tgz
+*.wpress
+backups/
+restore-work/
+
+# ACME and deployment state
+letsencrypt/
+acme-webroot/
+.deploy/
+deploy/releases/
+deploy/current
+
+# Local tooling
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.playwright-mcp/
+*.log

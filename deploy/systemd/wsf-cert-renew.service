@@ -1,0 +1,14 @@
+[Unit]
+Description=Renew We Sell Flavours test TLS certificate
+Wants=network-online.target
+After=network-online.target docker.service
+OnFailure=wsf-notify@%n.service
+
+[Service]
+Type=oneshot
+User=root
+Environment=SERVER_ENV_FILE=/etc/we-sell-flavours/server.env
+Environment=DEPLOY_INVENTORY_FILE=/srv/we-sell-flavours/deploy/inventory.env
+ExecStart=/srv/we-sell-flavours/scripts/server/renew-cert.sh
+Nice=10
+IOSchedulingClass=best-effort

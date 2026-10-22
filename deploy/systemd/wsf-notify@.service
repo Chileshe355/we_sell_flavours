@@ -1,0 +1,8 @@
+[Unit]
+Description=Notify operator about failed We Sell Flavours unit %i
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/etc/we-sell-flavours/server.env
+ExecStart=/srv/we-sell-flavours/scripts/server/notify.sh %i
